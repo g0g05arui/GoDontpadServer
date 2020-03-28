@@ -19,6 +19,9 @@ func init() {
 	helpString, _ = ioutil.ReadFile("___help.~goapp")
 }
 
+/*
+*@desc listens to port 9090 and launches client threads
+ */
 func main() {
 	ln, err := net.Listen("tcp", ":9090")
 	if err != nil {
@@ -36,33 +39,46 @@ func main() {
 	}
 }
 
+/*
+* @desc handles connections
+* parses commands and executes them then responds to the client
+ */
+
 func handleConnection(conn net.Conn) {
 	for {
+
 		netData, err := bufio.NewReader(conn).ReadString('\n')
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
-		netData = strings.TrimSpace(netData)
+		//Parse input
 		netData = strings.ReplaceAll(netData, " ", "")
 		n := len(netData)
-		if n >= 3 && netData[:3] == "get" && strings.Count(netData, `"`) == 2 {
+
+		//Validates and executes commands
+		if n >= 3 && netData[:3] == "get" && strings.Count(netData, `"`) == 2 { // Sends client the content of a file
+
 			netData = netData[4:]
 			filename, _ := getData(netData)
-			if isLockFile(filename) || filename == "___help.~goapp" {
+
+			if isLockFile(filename) || filename == "___help.~goapp" { //Checks if a file is private
 				conn.Write([]byte("Can't perform operation"))
 			} else {
-				conn.Write([]byte("ok" + getFile(filename)))
+				conn.Write([]byte("ok " + getFile(filename)))
 			}
-		} else if n >= 5 && netData[:5] == "write" && strings.Count(netData, `"`) == 6 {
+
+		} else if n >= 5 && netData[:5] == "write" && strings.Count(netData, `"`) == 6 { //Writes to an existing file or creates a new file with a password if told
+
 			netData = netData[6:]
 			filename, pos := getData(netData)
 			netData = netData[(pos + 1):]
 			text, pos := getData(netData)
 			netData = netData[(pos + 1):]
 			password, _ := getData(netData)
-			if isLockFile(filename) || filename == "___help.~goapp" || !canAccess(filename, password) {
+
+			if isLockFile(filename) || filename == "___help.~goapp" || !canAccess(filename, password) { //Checks for password of for protected files
 				if !canAccess(filename, password) {
 					conn.Write([]byte("Wrong Password"))
 				} else {
@@ -75,7 +91,9 @@ func handleConnection(conn net.Conn) {
 				write(filename, text)
 				conn.Write([]byte("ok"))
 			}
-		} else if n >= 8 && netData[:8] == "islocked" && strings.Count(netData, `"`) == 2 {
+
+		} else if n >= 8 && netData[:8] == "islocked" && strings.Count(netData, `"`) == 2 { //Checks if a file is password-protected
+
 			netData = netData[9:]
 			filename, _ := getData(netData)
 			if isLocked(filename) {
@@ -83,11 +101,14 @@ func handleConnection(conn net.Conn) {
 			} else {
 				conn.Write([]byte("no"))
 			}
-		} else if n >= 10 && netData[:10] == "removelock" && strings.Count(netData, `"`) == 4 {
+
+		} else if n >= 10 && netData[:10] == "removelock" && strings.Count(netData, `"`) == 4 { //Removes the password of a file if the password is correct
+
 			netData = netData[11:]
 			filename, pos := getData(netData)
 			netData = netData[(pos + 1):]
 			password, _ := getData(netData)
+
 			if isLocked(filename) {
 				if canAccess(filename, password) {
 					removeLock(filename)
@@ -108,6 +129,12 @@ func handleConnection(conn net.Conn) {
 	wg.Done()
 }
 
+/*
+* @ desc gets a string between two " characters
+* returns the string and the position of the next " character or the end
+* string must start with anything else than a "
+ */
+
 func getData(str string) (string, int) {
 	aux := ""
 	n := len(str)
@@ -119,12 +146,20 @@ func getData(str string) (string, int) {
 	return aux, i
 }
 
+/*
+* @ checks if a file exists
+ */
+
 func exists(fileName string) bool {
 	if _, err := os.Stat(fileName); err == nil {
 		return true
 	}
 	return false
 }
+
+/*
+* @ returns the content of a file
+ */
 
 func getFile(fileName string) string {
 	if !exists(fileName) {
@@ -134,11 +169,19 @@ func getFile(fileName string) string {
 	return string(aux)
 }
 
+/*
+* @ checks if a file is password protected
+* default format for a lock file is __filename.~lock
+ */
+
 func isLocked(fileName string) bool {
 	aux := "__" + fileName + ".~lock"
 	return exists(aux)
 }
 
+/*
+* @ checks if the filename is a file used for password protection
+ */
 func isLockFile(fileName string) bool {
 	n := len(fileName)
 	if n <= 8 {
@@ -147,6 +190,9 @@ func isLockFile(fileName string) bool {
 	return fileName[0:2] == "__" && fileName[n-6:n] == ".~lock"
 }
 
+/*
+* @ checks if a file can be accessed using a password(if protected)
+ */
 func canAccess(fileName, password string) bool {
 	if !isLocked(fileName) {
 		return true
@@ -156,14 +202,27 @@ func canAccess(fileName, password string) bool {
 	return bcrypt.CompareHashAndPassword(hash, []byte(password)) == nil
 }
 
+/*
+* @ creates a lock file with a specified password
+* @ uses the deafult format for lock files
+ */
+
 func lock(fileName, password string) {
 	aux, _ := bcrypt.GenerateFromPassword([]byte(password), 5)
 	ioutil.WriteFile("__"+fileName+".~lock", aux, 0666)
 }
 
+/*
+* @ updates or crates a file with specified text
+ */
+
 func write(fileName, text string) {
 	ioutil.WriteFile(fileName, []byte(text), 0666)
 }
+
+/*
+*@ removes the lock file for the spcified filename
+ */
 
 func removeLock(fileName string) {
 	os.Remove("__" + fileName + ".~lock")
