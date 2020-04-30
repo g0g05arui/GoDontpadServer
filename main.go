@@ -1,22 +1,36 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
+	"text/template"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 var wg sync.WaitGroup
 var helpString []byte
+var officialPassword []byte
+var pageCode, indexCode []byte
+
+/*
+	pageCode template helper struct
+*/
+type Helper struct {
+	Title   string
+	Content string
+}
 
 func init() {
 	helpString, _ = ioutil.ReadFile("___help.~goapp")
+	officialPassword, _ = ioutil.ReadFile("__password.~goapp")
+	pageCode, _ = ioutil.ReadFile("file.html")
+	indexCode, _ = ioutil.ReadFile("index.html")
 }
 
 /*
@@ -24,11 +38,24 @@ func init() {
  */
 func main() {
 	ln, err := net.Listen("tcp", ":9090")
+	http.HandleFunc("/", mainHandler)
+	http.HandleFunc("/view/", viewHandler)
+	http.HandleFunc("/save", saveHandler)
+	http.HandleFunc("/lock", lockHandler)
+	http.HandleFunc("/unlock", unlockHandler)
+	http.HandleFunc("/refresh", refreshHandler)
+
+	wg.Add(1)
+	go func() {
+		http.ListenAndServe(":8000", nil)
+		wg.Done()
+	}()
 	if err != nil {
 		return
 	}
 	for {
 		conn, err := ln.Accept()
+		fmt.Println("Connected")
 		wg.Add(1)
 		if err != nil {
 			conn.Close()
@@ -45,49 +72,55 @@ func main() {
  */
 
 func handleConnection(conn net.Conn) {
+	buf := make([]byte, 1024*1024)
+	req, _ := conn.Read(buf)
+	fmt.Println(req, string(buf[:req]))
+	netData := string(buf[:req])
+	if validateConnection(netData) == false {
+		fmt.Printf("Invalid password: %v |end", netData)
+		conn.Write([]byte("Invalid password"))
+		conn.Close()
+		return
+	}
+	conn.Write([]byte("ok password"))
 	for {
-
-		netData, err := bufio.NewReader(conn).ReadString('\n')
+		req, err := conn.Read(buf)
+		netData = string(buf[:req])
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
-
 		//Parse input
-		netData = strings.ReplaceAll(netData, " ", "")
+		netData = strings.TrimSpace(netData)
 		n := len(netData)
-
 		//Validates and executes commands
+		netData = strings.ReplaceAll(netData, `[[\n]]`, "\n")
+		fmt.Println(netData)
 		if n >= 3 && netData[:3] == "get" && strings.Count(netData, `"`) == 2 { // Sends client the content of a file
-
 			netData = netData[4:]
 			filename, _ := getData(netData)
-
-			if isLockFile(filename) || filename == "___help.~goapp" { //Checks if a file is private
+			if isLockFile(filename) || filename == "file.html" || filename == "index.htmml" || filename == "___help.~goapp" || filename == "__password.~goapp" || filename == "main.go" { //Checks if a file is private
 				conn.Write([]byte("Can't perform operation"))
 			} else {
 				conn.Write([]byte("ok " + getFile(filename)))
+				fmt.Println("ok " + getFile(filename))
 			}
 
-		} else if n >= 5 && netData[:5] == "write" && strings.Count(netData, `"`) == 6 { //Writes to an existing file or creates a new file with a password if told
-
+		} else if n >= 5 && netData[:5] == "write" && strings.Count(netData, `"`) >= 6 { //Writes to an existing file or creates a new file with a password if told
 			netData = netData[6:]
 			filename, pos := getData(netData)
 			netData = netData[(pos + 1):]
-			text, pos := getData(netData)
+			password, pos := getData(netData)
 			netData = netData[(pos + 1):]
-			password, _ := getData(netData)
-
-			if isLockFile(filename) || filename == "___help.~goapp" || !canAccess(filename, password) { //Checks for password of for protected files
+			text := netData[1 : len(netData)-1]
+			fmt.Println(filename, password, text)
+			if isLockFile(filename) || filename == "index.html" || filename == "file.html" || filename == "___help.~goapp" || filename == "__password.~goapp" || filename == "main.go" || !canAccess(filename, password) { //Checks for password of for protected files
 				if !canAccess(filename, password) {
 					conn.Write([]byte("Wrong Password"))
 				} else {
 					conn.Write([]byte("Private Data"))
 				}
 			} else {
-				if !isLocked(filename) && password != "" {
-					lock(filename, password)
-				}
 				write(filename, text)
 				conn.Write([]byte("ok"))
 			}
@@ -119,6 +152,17 @@ func handleConnection(conn net.Conn) {
 			} else {
 				conn.Write([]byte("Ok"))
 			}
+		} else if n >= 4 && netData[:4] == "lock" && strings.Count(netData, `"`) >= 4 {
+			netData = netData[5:]
+			filename, pos := getData(netData)
+			netData = netData[(pos + 1):]
+			password, _ := getData(netData)
+			if isLocked(filename) {
+				conn.Write([]byte("already locked"))
+			} else {
+				lock(filename, password)
+				conn.Write([]byte("ok"))
+			}
 		} else if n >= 4 && netData[:4] == "help" {
 			conn.Write(helpString)
 		} else {
@@ -135,10 +179,18 @@ func handleConnection(conn net.Conn) {
 * string must start with anything else than a "
  */
 
+func restOf(str string) string {
+	return ""
+}
+
 func getData(str string) (string, int) {
 	aux := ""
 	n := len(str)
 	i := 0
+	for ; str[i] != '"'; i++ {
+
+	}
+	i++
 	for ; i < n && str[i] != '"'; i++ {
 		aux += string([]byte{str[i]})
 	}
@@ -226,4 +278,63 @@ func write(fileName, text string) {
 
 func removeLock(fileName string) {
 	os.Remove("__" + fileName + ".~lock")
+}
+
+func validateConnection(password string) bool {
+	return bcrypt.CompareHashAndPassword(officialPassword, []byte(password)) == nil
+}
+
+/*
+	HTTP handler functions
+*/
+
+func mainHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "%s", string(indexCode))
+}
+
+func viewHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl, _ := template.New("html").Parse(string(pageCode))
+	filename := r.RequestURI[6:]
+	if !isLocked(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
+		tmpl.Execute(w, Helper{filename, getFile(filename)})
+	} else {
+		fmt.Fprintf(w, "Can't access page")
+	}
+}
+
+func saveHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	if canAccess(r.FormValue("f"), r.FormValue("p")) {
+		write(r.FormValue("f"), r.FormValue("textx"))
+		fmt.Fprintf(w, "ok")
+	} else {
+		fmt.Fprintf(w, "no")
+	}
+}
+
+func lockHandler(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Query().Get("f")
+	password := r.URL.Query().Get("p")
+	if !isLocked(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
+		lock(filename, password)
+		fmt.Fprintf(w, "locked")
+	} else {
+		fmt.Fprintf(w, "already locked")
+	}
+}
+
+func unlockHandler(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Query().Get("f")
+	password := r.URL.Query().Get("p")
+	if canAccess(filename, password) {
+		removeLock(filename)
+		fmt.Fprintf(w, "ok")
+	} else {
+		fmt.Fprintf(w, "no")
+	}
+}
+
+func refreshHandler(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Query().Get("f")
+	fmt.Fprintf(w, "%s", getFile(filename))
 }

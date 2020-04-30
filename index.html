@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            .maintext{
+                padding-top:6%;
+                font-size: 60px;
+            }      
+        </style>
+        <script>
+            function goToFile(){
+                var text=document.getElementById("filename").value;
+                window.location.href="/view/"+text;
+            }
+        </script>
+    </head>
+    <title>
+        Quick Share
+    </title>
+    <body>
+        <center>
+            <div class="maintext">
+                Quick Share
+            </div>
+            <br>
+            <div>
+                filename 
+                <input type="text" id="filename">
+                <button id="gobtn" onclick="goToFile()">go</button>
+            </div>
+        </center>
+    </body>
+</html>

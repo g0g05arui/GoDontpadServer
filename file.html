@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
+    <style> 
+        .buton{
+            width: 5%;
+            height:30px;
+            min-width: 70px;
+        };
+
+        .editbox
+        {
+            font-size:18pt;
+            height:100px;
+            width:50px;
+        };
+    </style>
+    <script>
+        const hLoc="{{.Title}}";
+        function newHiddenElement(name,key){
+            const hiddenField=document.createElement('input');
+            hiddenField.type='hidden';
+            hiddenField.name=name;
+            hiddenField.id=name;
+            hiddenField.value=key;
+            return hiddenField;
+        }
+        function onSave() {
+            if(document.getElementById('f')==null)
+                document.getElementById('textArea').appendChild(newHiddenElement("f",hLoc));
+            else
+                document.getElementById('f').value=hLoc;
+            if(document.getElementById('p')==null)
+                document.getElementById('textArea').appendChild(newHiddenElement("p",(document.getElementById('parola').value)));
+            else
+                document.getElementById('p').value=document.getElementById('parola').value;
+            var form=$('#textArea');
+            $.ajax({
+                type:"POST",
+                url:"/save",
+                data:form.serialize(),
+                success:function(data){
+                    alert(data);
+                }
+            }) ;
+        }
+        function onLock(){
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.open( "GET","/lock?f="+hLoc+"&p="+document.getElementById('parola').value, false );
+            xmlHttp.send( null );
+            alert(xmlHttp.responseText);
+        }
+        function onUnLock(){
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.open( "GET","/unlock?f="+hLoc+"&p="+document.getElementById('parola').value, false );
+            xmlHttp.send( null );
+            alert(xmlHttp.responseText);
+        }
+        function onBack(){
+            window.location.href="/"
+        }
+        function onRefresh(){
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.open( "GET","/refresh?f="+hLoc, false );
+            xmlHttp.send( null );
+            document.getElementById('textx').value=xmlHttp.responseText;
+        }
+    </script>
+    </head>
+    <title>{{.Title}}</title>
+    <body>
+        <center>
+            <div>
+                <button type="button" class="buton" id="back" onclick="onBack()">Back</button>
+                <button type="button" class="buton" id="refresh" onclick="onRefresh()">Refresh</button>
+                <button type="button" class="buton" id="save" onclick="onSave()">Save</button>
+                <button type="button" class="buton" id="lock" onclick="onLock()">Lock</button>
+                <input type="password" id="parola">
+                <button type="button" class="buton" id="unlock" onclick="onUnLock()">Unlock</button>
+            </div>
+            <br>
+        </center>
+        <div style="height:80%;width:100%;">
+            <form name="textArea" id="textArea" action="/save" method="post">
+                <textarea id="textx" name="textx" style="width: 100%;  height: 92vh; ">{{.Content}}</textarea>
+            </form>
+        </div>
+    </body>
+</html>

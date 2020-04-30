@@ -1,5 +1,5 @@
 get "filename"              -> returns ok "text"
-write "filename" "password" -> updates the file and uses the password if neccessary NULL for no password , returns "
+write "filename" "password" "text" -> updates the file and uses the password if neccessary NULL for no password , returns "
                             -> returns "ok" or "wrong"
 lock "filename" "password"  -> locks the file with the password if it isn't already locked
                             -> returns "ok" or "already_locked"
