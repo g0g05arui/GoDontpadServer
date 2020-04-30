@@ -27,7 +27,7 @@ type Helper struct {
 }
 
 func init() {
-	helpString, _ = ioutil.ReadFile("___help.~goapp")
+	helpString, _ = ioutil.ReadFile("__help.~goapp")
 	officialPassword, _ = ioutil.ReadFile("__password.~goapp")
 	pageCode, _ = ioutil.ReadFile("file.html")
 	indexCode, _ = ioutil.ReadFile("index.html")
