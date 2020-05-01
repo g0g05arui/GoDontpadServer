@@ -295,7 +295,8 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, _ := template.New("html").Parse(string(pageCode))
 	filename := r.RequestURI[6:]
-	if !isLocked(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
+	fmt.Println(filename)
+	if !isLockFile(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
 		tmpl.Execute(w, Helper{filename, getFile(filename)})
 	} else {
 		fmt.Fprintf(w, "Can't access page")
@@ -315,11 +316,11 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 func lockHandler(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("f")
 	password := r.URL.Query().Get("p")
-	if !isLocked(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
+	if !isLockFile(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
 		lock(filename, password)
-		fmt.Fprintf(w, "locked")
+		fmt.Fprintf(w, "File locked successfully")
 	} else {
-		fmt.Fprintf(w, "already locked")
+		fmt.Fprintf(w, "File is already locked")
 	}
 }
 
@@ -328,9 +329,9 @@ func unlockHandler(w http.ResponseWriter, r *http.Request) {
 	password := r.URL.Query().Get("p")
 	if canAccess(filename, password) {
 		removeLock(filename)
-		fmt.Fprintf(w, "ok")
+		fmt.Fprintf(w, "File has been unlocked")
 	} else {
-		fmt.Fprintf(w, "no")
+		fmt.Fprintf(w, "Wrong Passowrd")
 	}
 }
 
