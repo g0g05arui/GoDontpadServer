@@ -95,7 +95,6 @@ func handleConnection(conn net.Conn) {
 		n := len(netData)
 		//Validates and executes commands
 		netData = strings.ReplaceAll(netData, `[[\n]]`, "\n")
-		fmt.Println(netData)
 		if n >= 3 && netData[:3] == "get" && strings.Count(netData, `"`) == 2 { // Sends client the content of a file
 			netData = netData[4:]
 			filename, _ := getData(netData)
@@ -113,7 +112,6 @@ func handleConnection(conn net.Conn) {
 			password, pos := getData(netData)
 			netData = netData[(pos + 1):]
 			text := netData[1 : len(netData)-1]
-			fmt.Println(filename, password, text)
 			if isLockFile(filename) || filename == "index.html" || filename == "file.html" || filename == "___help.~goapp" || filename == "__password.~goapp" || filename == "main.go" || !canAccess(filename, password) { //Checks for password of for protected files
 				if !canAccess(filename, password) {
 					conn.Write([]byte("Wrong Password"))
@@ -214,6 +212,7 @@ func exists(fileName string) bool {
  */
 
 func getFile(fileName string) string {
+	fileName = "files/" + fileName
 	if !exists(fileName) {
 		ioutil.WriteFile(fileName, []byte(""), 0666)
 	}
@@ -227,7 +226,7 @@ func getFile(fileName string) string {
  */
 
 func isLocked(fileName string) bool {
-	aux := "__" + fileName + ".~lock"
+	aux := "lock/__" + fileName + ".~lock"
 	return exists(aux)
 }
 
@@ -249,7 +248,7 @@ func canAccess(fileName, password string) bool {
 	if !isLocked(fileName) {
 		return true
 	}
-	aux := "__" + fileName + ".~lock"
+	aux := "lock/__" + fileName + ".~lock"
 	hash, _ := ioutil.ReadFile(aux)
 	return bcrypt.CompareHashAndPassword(hash, []byte(password)) == nil
 }
@@ -261,7 +260,7 @@ func canAccess(fileName, password string) bool {
 
 func lock(fileName, password string) {
 	aux, _ := bcrypt.GenerateFromPassword([]byte(password), 5)
-	ioutil.WriteFile("__"+fileName+".~lock", aux, 0666)
+	ioutil.WriteFile("lock/__"+fileName+".~lock", aux, 0666)
 }
 
 /*
@@ -269,7 +268,7 @@ func lock(fileName, password string) {
  */
 
 func write(fileName, text string) {
-	ioutil.WriteFile(fileName, []byte(text), 0666)
+	ioutil.WriteFile("files/"+fileName, []byte(text), 0666)
 }
 
 /*
@@ -277,7 +276,7 @@ func write(fileName, text string) {
  */
 
 func removeLock(fileName string) {
-	os.Remove("__" + fileName + ".~lock")
+	os.Remove("lock/__" + fileName + ".~lock")
 }
 
 func validateConnection(password string) bool {
@@ -295,7 +294,6 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, _ := template.New("html").Parse(string(pageCode))
 	filename := r.RequestURI[6:]
-	fmt.Println(filename)
 	if !isLockFile(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
 		tmpl.Execute(w, Helper{filename, getFile(filename)})
 	} else {
