@@ -284,12 +284,38 @@ func validateConnection(password string) bool {
 }
 
 /*
-	HTTP handler functions
+	@ReadUserIp(r)
+	returns the ip of a user as string
+	from a http Request
+*/
+
+func ReadUserIP(r *http.Request) string {
+	IPAddress := r.Header.Get("X-Real-Ip")
+	if IPAddress == "" {
+		IPAddress = r.Header.Get("X-Forwarded-For")
+	}
+	if IPAddress == "" {
+		IPAddress = r.RemoteAddr
+	}
+	return IPAddress
+}
+
+/*
+	@mainHandler (w,r)
+	@desc respondes to the main page event
+	and logs user's IP
 */
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(ReadUserIP(r))
 	fmt.Fprintf(w, "%s", string(indexCode))
 }
+
+/*
+	@viewHandler(w,r)
+	@desc respondes to the view page request
+	sending the html file with the file's content
+*/
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, _ := template.New("html").Parse(string(pageCode))
@@ -301,6 +327,12 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+/*
+	@saveHandler(w,r)
+	@desc : handles save for a file's
+	request
+*/
+
 func saveHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	if canAccess(r.FormValue("f"), r.FormValue("p")) {
@@ -311,16 +343,30 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+/*
+	@lockHandler(w,r)
+	@desc : if a file isn't already locked
+	it locks it with the specified password
+	and returns the apropiate response
+*/
+
 func lockHandler(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("f")
 	password := r.URL.Query().Get("p")
-	if !isLockFile(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
+	if !isLocked(filename) && !isLockFile(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
 		lock(filename, password)
 		fmt.Fprintf(w, "File locked successfully")
 	} else {
 		fmt.Fprintf(w, "File is already locked")
 	}
 }
+
+/*
+	@unlockHandler(w,r)
+	@desc handles the unlock request if
+	the file is locked with the specified
+	password and returns the status
+*/
 
 func unlockHandler(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("f")
@@ -332,6 +378,12 @@ func unlockHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Wrong Passowrd")
 	}
 }
+
+/*
+	@refreshHandler(w,r)
+	@desc handles the refresh querry
+	returns the page content with the file
+*/
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("f")

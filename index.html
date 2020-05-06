@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <link href="https://fonts.googleapis.com/css?family=Baloo%20Bhaina%202" rel="stylesheet">
         <style>
             .maintext{
-                padding-top:6%;
-                font-size: 60px;
-            }      
+                padding-top:5%;
+                font-size: 75px;
+                color:#4add8c;
+            }   
+            body{
+                background-color:#27586B;
+                font-family:'Baloo Bhaina 2';
+            }   
         </style>
         <script>
             function goToFile(){
@@ -20,13 +26,20 @@
     <body>
         <center>
             <div class="maintext">
-                Quick Share
+                Quick share
+                <div style="font-size:40px;padding-top: 0%;">
+                    The easiest way to share your ideas
+                </div>
             </div>
-            <br>
-            <div>
+                
+            <div style="color:#4add8c
+            ;font-size:20px;">
+            
                 filename 
                 <input type="text" id="filename">
-                <button id="gobtn" onclick="goToFile()">go</button>
+                <button id="gobtn" onclick="goToFile()" style="background-color:#27586B
+                ;color:#4add8c;">Go to file</button>
+                <br>
             </div>
         </center>
     </body>
