@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -17,6 +18,9 @@ var wg sync.WaitGroup
 var helpString []byte
 var officialPassword []byte
 var pageCode, indexCode []byte
+var lastLogIndex int
+var logFile *os.File
+var charWrittenInLogFile int
 
 /*
 	pageCode template helper struct
@@ -74,10 +78,10 @@ func main() {
 func handleConnection(conn net.Conn) {
 	buf := make([]byte, 1024*1024)
 	req, _ := conn.Read(buf)
-	fmt.Println(req, string(buf[:req]))
 	netData := string(buf[:req])
+	logString(conn.RemoteAddr().String() + " " + netData)
 	if validateConnection(netData) == false {
-		fmt.Printf("Invalid password: %v |end", netData)
+		logString("Invalid password:" + netData)
 		conn.Write([]byte("Invalid password"))
 		conn.Close()
 		return
@@ -86,12 +90,14 @@ func handleConnection(conn net.Conn) {
 	for {
 		req, err := conn.Read(buf)
 		netData = string(buf[:req])
+
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 		//Parse input
 		netData = strings.TrimSpace(netData)
+		logString(conn.RemoteAddr().String() + " " + netData)
 		n := len(netData)
 		//Validates and executes commands
 		netData = strings.ReplaceAll(netData, `[[\n]]`, "\n")
@@ -102,7 +108,6 @@ func handleConnection(conn net.Conn) {
 				conn.Write([]byte("Can't perform operation"))
 			} else {
 				conn.Write([]byte("ok " + getFile(filename)))
-				fmt.Println("ok " + getFile(filename))
 			}
 
 		} else if n >= 5 && netData[:5] == "write" && strings.Count(netData, `"`) >= 6 { //Writes to an existing file or creates a new file with a password if told
@@ -307,7 +312,7 @@ func ReadUserIP(r *http.Request) string {
 */
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(ReadUserIP(r))
+	logString(ReadUserIP(r) + " on main " + r.RequestURI)
 	fmt.Fprintf(w, "%s", string(indexCode))
 }
 
@@ -318,6 +323,7 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 */
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
+	logString(ReadUserIP(r) + " on view " + r.RequestURI)
 	tmpl, _ := template.New("html").Parse(string(pageCode))
 	filename := r.RequestURI[6:]
 	if !isLockFile(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
@@ -334,6 +340,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 */
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
+	logString(ReadUserIP(r) + " on save " + r.RequestURI)
 	r.ParseForm()
 	if canAccess(r.FormValue("f"), r.FormValue("p")) {
 		write(r.FormValue("f"), r.FormValue("textx"))
@@ -351,6 +358,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 */
 
 func lockHandler(w http.ResponseWriter, r *http.Request) {
+	logString(ReadUserIP(r) + " on lock " + r.RequestURI)
 	filename := r.URL.Query().Get("f")
 	password := r.URL.Query().Get("p")
 	if !isLocked(filename) && !isLockFile(filename) && filename != "index.html" && filename != "file.html" && filename != "__help.~goapp" && filename != "__password.~goapp" && filename != "main.go" {
@@ -369,6 +377,7 @@ func lockHandler(w http.ResponseWriter, r *http.Request) {
 */
 
 func unlockHandler(w http.ResponseWriter, r *http.Request) {
+	logString(ReadUserIP(r) + " on unlock " + r.RequestURI)
 	filename := r.URL.Query().Get("f")
 	password := r.URL.Query().Get("p")
 	if canAccess(filename, password) {
@@ -386,6 +395,20 @@ func unlockHandler(w http.ResponseWriter, r *http.Request) {
 */
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
+	logString(ReadUserIP(r) + " on refresh " + r.RequestURI)
 	filename := r.URL.Query().Get("f")
 	fmt.Fprintf(w, "%s", getFile(filename))
+}
+
+func logString(log string) {
+	if lastLogIndex == 0 {
+		logFile, _ = os.OpenFile("logs/log1.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		lastLogIndex++
+	} else if charWrittenInLogFile >= 1024*1024*4 {
+		logFile.Close()
+		lastLogIndex++
+		logFile, _ = os.OpenFile("logs/log"+strconv.Itoa(lastLogIndex)+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	}
+	fmt.Fprintln(logFile, log)
+	charWrittenInLogFile += len(log)
 }
