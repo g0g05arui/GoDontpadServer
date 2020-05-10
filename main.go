@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -48,7 +49,7 @@ func main() {
 	http.HandleFunc("/lock", lockHandler)
 	http.HandleFunc("/unlock", unlockHandler)
 	http.HandleFunc("/refresh", refreshHandler)
-
+	http.HandleFunc("/md5", md5Handler)
 	wg.Add(1)
 	go func() {
 		http.ListenAndServe(":8000", nil)
@@ -398,6 +399,12 @@ func refreshHandler(w http.ResponseWriter, r *http.Request) {
 	logString(ReadUserIP(r) + " on refresh " + r.RequestURI)
 	filename := r.URL.Query().Get("f")
 	fmt.Fprintf(w, "%s", getFile(filename))
+}
+
+func md5Handler(w http.ResponseWriter, r *http.Request) {
+	logString(ReadUserIP(r) + "on md5 " + r.RequestURI)
+	filename := r.URL.Query().Get("f")
+	fmt.Fprintf(w, "%x", md5.Sum([]byte(getFile(filename))))
 }
 
 func logString(log string) {

@@ -4,6 +4,9 @@
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css">
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/md5.js"></script>
     <style> 
         .buton{
             width: 5%;
@@ -27,6 +30,33 @@
 
     <script>
         const hLoc="{{.Title}}";
+        window.setInterval(intervalF,3500);
+        var lastWrite=Date.now();
+        $(document).on('input propertychange', "textarea[name='textx']", function () {
+            lastWrite=Date.now();
+        });
+        function intervalF(){
+            const diff=Math.abs(Date.now()-lastWrite);
+            console.log(lastWrite);
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.open( "GET","/md5?f="+hLoc,false );
+            xmlHttp.send( null );
+            var response=xmlHttp.responseText;
+            var hash=CryptoJS.MD5(document.getElementById('textx').value).toString();
+
+            if(diff>=5000){
+                if(hash!=response){
+                    onRefresh();
+                    console.log("auto refresh");
+                }
+            }
+            else{
+                if(hash!=response){
+                    onSave();
+                    console.log("auto save");
+                }
+            }
+        }
         function newHiddenElement(name,key){
             const hiddenField=document.createElement('input');
             hiddenField.type='hidden';
@@ -35,7 +65,7 @@
             hiddenField.value=key;
             return hiddenField;
         }
-        function onSave() {
+        function onSave(notif) {
             if(document.getElementById('f')==null)
                 document.getElementById('textArea').appendChild(newHiddenElement("f",hLoc));
             else
@@ -50,11 +80,12 @@
                 url:"/save",
                 data:form.serialize(),
                 success:function(data){
-                    if(data=="ok")
-                         toastr.success('File successfully saved');
-                    else
-                        toastr.error('Wrong password');
-                        
+                    if(notif==0)
+                        if(data=="ok")
+                            toastr.success('File successfully saved');
+                        else
+                            toastr.error('Wrong password');
+                            
                 }
             }) ;
             
@@ -79,7 +110,11 @@
         function onBack(){
             window.location.href="/"
         }
-        function onRefresh(){
+        function onTextChange(){
+            lastWrite=Date.now();
+            alert("Modified");
+        }
+        function onRefresh(notif){
             var xmlHttp = new XMLHttpRequest();
             xmlHttp.open( "GET","/refresh?f="+hLoc, false );
             xmlHttp.send( null );
@@ -110,8 +145,8 @@
         <center>
             <div>
                 <button type="button" class="buton" id="back" onclick="onBack()">Back</button>
-                <button type="button" class="buton" id="refresh" onclick="onRefresh()">Refresh</button>
-                <button type="button" class="buton" id="save" onclick="onSave()">Save</button>
+                <button type="button" class="buton" id="refresh" onclick="onRefresh(0)">Refresh</button>
+                <button type="button" class="buton" id="save" onclick="onSave(0)">Save</button>
                 <button type="button" class="buton" id="lock" onclick="onLock()">Lock</button>
                 <input type="password" id="parola">
                 <button type="button" class="buton" id="unlock" onclick="onUnLock()">Unlock</button>
